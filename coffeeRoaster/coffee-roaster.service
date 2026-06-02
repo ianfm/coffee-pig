@@ -1,6 +1,6 @@
 [Unit]
 Description=Coffee roaster drum motor daemon
-After=multi-user.target
+After=network.target
 
 [Service]
 Type=simple
