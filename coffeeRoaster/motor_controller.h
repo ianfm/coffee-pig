@@ -7,9 +7,7 @@ public:
     MotorController();
 
     bool init();
-    bool setVelocity(double rpm);
-    bool disable();
-    bool enable();
+    bool setVelocity(double rpm);  // 0 = disable, >0 = enable + spin
     bool checkAlerts();
     void shutdown();
     bool reconnect();

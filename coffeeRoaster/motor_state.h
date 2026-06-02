@@ -15,8 +15,6 @@ struct MotorState {
 
     // Written by socket thread, read by main thread
     double targetRpm = 0.0;
-    bool disableRequested = false;
-    bool enableRequested = false;
 
     // Written by main thread, read by socket thread
     double commandedRpm = 0.0;

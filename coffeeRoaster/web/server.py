@@ -108,16 +108,6 @@ def api_stop():
     return jsonify(daemon_command("STOP"))
 
 
-@app.route("/api/disable", methods=["POST"])
-def api_disable():
-    return jsonify(daemon_command("DISABLE"))
-
-
-@app.route("/api/enable", methods=["POST"])
-def api_enable():
-    return jsonify(daemon_command("ENABLE"))
-
-
 @app.route("/api/presets", methods=["GET"])
 def api_presets_list():
     return jsonify(load_presets())

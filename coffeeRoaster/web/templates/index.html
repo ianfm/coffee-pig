@@ -103,8 +103,6 @@
   .action-btn:active { opacity: 0.7; }
   .btn-start { background: var(--green); color: #fff; }
   .btn-stop  { background: var(--red); color: #fff; }
-  .btn-disable { background: #555; color: var(--muted); font-size: 1em; padding: 12px; }
-  .btn-enable  { background: var(--accent); color: #000; font-size: 1em; padding: 12px; }
 
   /* Presets */
   .preset-grid {
@@ -194,7 +192,6 @@
 </div>
 
 <button id="actionBtn" class="action-btn btn-start" onclick="toggleMotor()">START</button>
-<button id="disableBtn" class="action-btn btn-disable" onclick="toggleDisable()">DISABLE MOTOR</button>
 
 <div class="card">
   <div class="card-title">Presets</div>
@@ -223,14 +220,13 @@
 
 <script>
 // --- State ---
-let currentTarget = 0;
 let isRunning = false;
 let presets = [];
 let timerInterval = null;
 let timerRemaining = 0;
 let timerRunning = false;
-let lastSetRpm = 0; // speed before STOP, to resume with START
-let motorEnabled = false;
+let desiredRpm = 15; // what the user has dialed in (persists across stop/start)
+let pendingSend = false; // true while a command is in-flight
 
 // --- API helpers ---
 async function api(url, opts) {
@@ -242,19 +238,22 @@ async function api(url, opts) {
   }
 }
 
-async function setSpeed(rpm) {
-  rpm = Math.max(0, Math.min(60, parseFloat(rpm) || 0));
+async function sendSpeed(rpm) {
+  pendingSend = true;
   const res = await api('/api/speed', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({rpm})
   });
+  pendingSend = false;
   if (res.ok) updateFromStatus(res);
   return res;
 }
 
-async function stopMotor() {
+async function sendStop() {
+  pendingSend = true;
   const res = await api('/api/stop', {method: 'POST'});
+  pendingSend = false;
   if (res.ok) updateFromStatus(res);
   return res;
 }
@@ -272,13 +271,17 @@ function updateFromStatus(s) {
   document.getElementById('motorDot').className = s.motorConnected ? 'status-dot ok' : 'status-dot err';
   document.getElementById('motorLabel').textContent = s.motorConnected ? 'Motor' : 'Motor disconnected';
 
-  const banner = document.getElementById('alertBanner');
-  banner.style.display = s.hasAlert ? 'block' : 'none';
+  document.getElementById('alertBanner').style.display = s.hasAlert ? 'block' : 'none';
 
-  currentTarget = s.targetRpm;
-  document.getElementById('rpmValue').textContent = s.targetRpm.toFixed(1);
+  // Don't let SSE overwrite the display while the user is actively adjusting
+  if (!pendingSend) {
+    document.getElementById('rpmValue').textContent = s.targetRpm.toFixed(1);
+    isRunning = s.targetRpm > 0;
+    updateButton();
+  }
+}
 
-  isRunning = s.targetRpm > 0;
+function updateButton() {
   const btn = document.getElementById('actionBtn');
   if (isRunning) {
     btn.textContent = 'STOP';
@@ -287,66 +290,49 @@ function updateFromStatus(s) {
     btn.textContent = 'START';
     btn.className = 'action-btn btn-start';
   }
-
-  motorEnabled = s.motorEnabled !== false;
-  const disBtn = document.getElementById('disableBtn');
-  if (motorEnabled) {
-    disBtn.textContent = 'DISABLE MOTOR';
-    disBtn.className = 'action-btn btn-disable';
-  } else {
-    disBtn.textContent = 'ENABLE MOTOR';
-    disBtn.className = 'action-btn btn-enable';
-  }
 }
 
 // --- Speed controls ---
 const slider = document.getElementById('rpmSlider');
 const rpmInput = document.getElementById('rpmInput');
 
-let sendTimeout = null;
-function queueSend(rpm) {
-  // Update display immediately, debounce the network call
-  document.getElementById('rpmValue').textContent = parseFloat(rpm).toFixed(1);
+// Update the dial UI without sending a command (user is choosing a speed)
+function updateDial(rpm) {
+  rpm = Math.max(0, Math.min(60, parseFloat(rpm) || 0));
+  desiredRpm = rpm;
   slider.value = rpm;
   rpmInput.value = rpm;
-  lastSetRpm = rpm;
-  clearTimeout(sendTimeout);
-  sendTimeout = setTimeout(() => setSpeed(rpm), 100);
-}
-
-slider.addEventListener('input', () => queueSend(slider.value));
-rpmInput.addEventListener('change', () => queueSend(rpmInput.value));
-
-document.getElementById('btnPlus').addEventListener('click', () => {
-  let v = Math.min(60, parseFloat(rpmInput.value || 0) + 0.5);
-  queueSend(v);
-});
-document.getElementById('btnMinus').addEventListener('click', () => {
-  let v = Math.max(0, parseFloat(rpmInput.value || 0) - 0.5);
-  queueSend(v);
-});
-
-// --- Start / Stop / Disable ---
-function toggleMotor() {
+  document.getElementById('rpmValue').textContent = rpm.toFixed(1);
+  // If motor is already running, send the new speed live
   if (isRunning) {
-    lastSetRpm = currentTarget;
-    stopMotor();
-  } else {
-    if (!motorEnabled) {
-      api('/api/enable', {method: 'POST'}).then(r => { if (r.ok) updateFromStatus(r); });
-    }
-    let rpm = lastSetRpm > 0 ? lastSetRpm : parseFloat(rpmInput.value) || 15;
-    queueSend(rpm);
+    clearTimeout(liveTimeout);
+    liveTimeout = setTimeout(() => sendSpeed(rpm), 100);
   }
 }
 
-async function toggleDisable() {
-  if (motorEnabled) {
-    const res = await api('/api/disable', {method: 'POST'});
-    if (res.ok) updateFromStatus(res);
+let liveTimeout = null;
+slider.addEventListener('input', () => updateDial(slider.value));
+rpmInput.addEventListener('change', () => updateDial(rpmInput.value));
+
+document.getElementById('btnPlus').addEventListener('click', () => {
+  updateDial(Math.min(60, desiredRpm + 0.5));
+});
+document.getElementById('btnMinus').addEventListener('click', () => {
+  updateDial(Math.max(0, desiredRpm - 0.5));
+});
+
+// --- Start / Stop ---
+function toggleMotor() {
+  if (isRunning) {
+    isRunning = false;
+    updateButton();
+    sendStop();
   } else {
-    const res = await api('/api/enable', {method: 'POST'});
-    if (res.ok) updateFromStatus(res);
+    let rpm = desiredRpm > 0 ? desiredRpm : 15;
+    isRunning = true;
+    updateButton();
+    document.getElementById('rpmValue').textContent = rpm.toFixed(1);
+    sendSpeed(rpm);
   }
 }
 

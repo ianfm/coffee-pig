@@ -10,9 +10,9 @@
 //   SET <rpm>\n   → OK <target> <commanded> <connected> <alert> <enabled>\n
 //   GET\n         → OK <target> <commanded> <connected> <alert> <enabled>\n
 //   STOP\n        → OK 0.0 <commanded> <connected> <alert> <enabled>\n
-//   DISABLE\n     → OK 0.0 <commanded> <connected> <alert> <enabled>\n
-//   ENABLE\n      → OK <target> <commanded> <connected> <alert> <enabled>\n
 //   ERR <msg>\n   (on parse failure)
+//
+// SET 0 / STOP disables the motor. SET >0 auto-enables it.
 
 class SocketServer {
 public:

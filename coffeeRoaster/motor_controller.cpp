@@ -75,61 +75,40 @@ bool MotorController::setVelocity(double rpm) {
         return false;
 
     try {
-        m_node->Motion.MoveVelStart(rpm);
-    } catch (mnErr &e) {
-        fprintf(stderr, "MoveVelStart failed: err=0x%08x msg=%s\n",
-                e.ErrorCode, e.ErrorMsg);
-        m_connected = false;
-        return false;
-    }
-
-    return true;
-}
-
-bool MotorController::disable() {
-    if (!m_connected || !m_node)
-        return false;
-
-    try {
-        m_node->Motion.MoveVelStart(0);
-        m_node->EnableReq(false);
-        m_enabled = false;
-        printf("Motor disabled.\n");
-    } catch (mnErr &e) {
-        fprintf(stderr, "Disable failed: err=0x%08x msg=%s\n",
-                e.ErrorCode, e.ErrorMsg);
-        m_connected = false;
-        return false;
-    }
-    return true;
-}
-
-bool MotorController::enable() {
-    if (!m_connected || !m_node)
-        return false;
-    if (m_enabled)
-        return true;
-
-    try {
-        m_node->Motion.NodeStopClear();
-        m_node->Status.AlertsClear();
-        m_node->EnableReq(true);
-
-        double timeout = m_mgr->TimeStampMsec() + ENABLE_TIMEOUT_MS;
-        while (!m_node->Motion.IsReady()) {
-            if (m_mgr->TimeStampMsec() > timeout) {
-                fprintf(stderr, "Timed out waiting for re-enable.\n");
-                return false;
+        if (rpm <= 0.0) {
+            // Disable: stop and release the motor
+            if (m_enabled) {
+                m_node->Motion.MoveVelStart(0);
+                m_node->EnableReq(false);
+                m_enabled = false;
+                printf("Motor disabled.\n");
             }
+        } else {
+            // Enable if needed, then spin
+            if (!m_enabled) {
+                m_node->Motion.NodeStopClear();
+                m_node->Status.AlertsClear();
+                m_node->EnableReq(true);
+
+                double timeout = m_mgr->TimeStampMsec() + ENABLE_TIMEOUT_MS;
+                while (!m_node->Motion.IsReady()) {
+                    if (m_mgr->TimeStampMsec() > timeout) {
+                        fprintf(stderr, "Timed out waiting for enable.\n");
+                        return false;
+                    }
+                }
+                m_enabled = true;
+                printf("Motor enabled.\n");
+            }
+            m_node->Motion.MoveVelStart(rpm);
         }
-        m_enabled = true;
-        printf("Motor re-enabled.\n");
     } catch (mnErr &e) {
-        fprintf(stderr, "Enable failed: err=0x%08x msg=%s\n",
+        fprintf(stderr, "setVelocity failed: err=0x%08x msg=%s\n",
                 e.ErrorCode, e.ErrorMsg);
         m_connected = false;
         return false;
     }
+
     return true;
 }
 
