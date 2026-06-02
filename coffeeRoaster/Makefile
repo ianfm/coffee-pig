@@ -1,11 +1,10 @@
 # coffeeRoaster - Web-controlled ClearPath-SC drum motor
 #
-# Build:   make RPATH=../sFoundation/sFoundation
+# Build:   make
 # Install: sudo make install
 
 EXEC_NAME := coffee-roaster
-SF_ROOT := ../sFoundation
-INCLUDE_DIR := $(SF_ROOT)/inc/inc-pub
+INCLUDE_DIR := ../sFoundation/inc/inc-pub
 LIBS := -lsFoundation20 -lpthread
 CXX := g++
 CXXFLAGS := -std=c++11 -I$(INCLUDE_DIR) -O3 -Wall
@@ -26,11 +25,17 @@ else
 endif
 
 install: $(EXEC_NAME)
+	@if ! grep -qP '^User=\S' coffee-roaster.service || ! grep -qP '^User=\S' web/coffee-roaster-web.service; then \
+		echo "Error: Set User= in coffee-roaster.service and web/coffee-roaster-web.service before installing."; \
+		exit 1; \
+	fi
 	install -m 755 $(EXEC_NAME) /usr/local/bin/
 	install -m 644 coffee-roaster.service /etc/systemd/system/
 	install -m 644 web/coffee-roaster-web.service /etc/systemd/system/
 	install -d /opt/coffee-roaster/web
 	cp -r web/* /opt/coffee-roaster/web/
+	@USER=$$(grep -oP '^User=\K\S+' web/coffee-roaster-web.service); \
+	chown -R $$USER:$$USER /opt/coffee-roaster/web/
 	systemctl daemon-reload
 
 uninstall:
