@@ -17,12 +17,10 @@ cd coffeeRoaster
 make
 sudo make install
 pip3 install --break-system-packages flask
-
-# Set your username in the service files
-sudo sed -i "s/^#User=$/User=$(whoami)/" /etc/systemd/system/coffee-roaster.service /etc/systemd/system/coffee-roaster-web.service
-sudo systemctl daemon-reload
 sudo systemctl enable --now coffee-roaster coffee-roaster-web
 ```
+
+`make install` will automatically set the service files to run as the current user if not already configured.
 
 ## Usage
 
