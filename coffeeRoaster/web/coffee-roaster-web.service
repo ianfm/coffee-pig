@@ -1,7 +1,6 @@
 [Unit]
 Description=Coffee roaster web controller
-After=coffee-roaster.service network.target
-BindsTo=coffee-roaster.service
+After=network.target
 
 [Service]
 Type=simple
@@ -15,4 +14,4 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=coffee-roaster.service
+WantedBy=multi-user.target
