@@ -8,7 +8,7 @@
 using namespace sFnd;
 
 MotorController::MotorController()
-    : m_mgr(nullptr), m_node(nullptr), m_connected(false) {}
+    : m_mgr(nullptr), m_node(nullptr), m_connected(false), m_enabled(false) {}
 
 bool MotorController::init() {
     m_mgr = SysManager::Instance();
@@ -66,6 +66,7 @@ bool MotorController::init() {
 
     printf("Node enabled and ready.\n");
     m_connected = true;
+    m_enabled = true;
     return true;
 }
 
@@ -82,6 +83,53 @@ bool MotorController::setVelocity(double rpm) {
         return false;
     }
 
+    return true;
+}
+
+bool MotorController::disable() {
+    if (!m_connected || !m_node)
+        return false;
+
+    try {
+        m_node->Motion.MoveVelStart(0);
+        m_node->EnableReq(false);
+        m_enabled = false;
+        printf("Motor disabled.\n");
+    } catch (mnErr &e) {
+        fprintf(stderr, "Disable failed: err=0x%08x msg=%s\n",
+                e.ErrorCode, e.ErrorMsg);
+        m_connected = false;
+        return false;
+    }
+    return true;
+}
+
+bool MotorController::enable() {
+    if (!m_connected || !m_node)
+        return false;
+    if (m_enabled)
+        return true;
+
+    try {
+        m_node->Motion.NodeStopClear();
+        m_node->Status.AlertsClear();
+        m_node->EnableReq(true);
+
+        double timeout = m_mgr->TimeStampMsec() + ENABLE_TIMEOUT_MS;
+        while (!m_node->Motion.IsReady()) {
+            if (m_mgr->TimeStampMsec() > timeout) {
+                fprintf(stderr, "Timed out waiting for re-enable.\n");
+                return false;
+            }
+        }
+        m_enabled = true;
+        printf("Motor re-enabled.\n");
+    } catch (mnErr &e) {
+        fprintf(stderr, "Enable failed: err=0x%08x msg=%s\n",
+                e.ErrorCode, e.ErrorMsg);
+        m_connected = false;
+        return false;
+    }
     return true;
 }
 

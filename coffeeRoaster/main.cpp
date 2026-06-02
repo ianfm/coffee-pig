@@ -51,13 +51,28 @@ int main() {
 
     while (g_state.running.load()) {
         double target;
+        bool wantDisable = false;
+        bool wantEnable = false;
         {
             std::lock_guard<std::mutex> lock(g_state.mtx);
             target = g_state.targetRpm;
+            wantDisable = g_state.disableRequested;
+            wantEnable = g_state.enableRequested;
+            g_state.disableRequested = false;
+            g_state.enableRequested = false;
         }
 
-        // Send velocity command if target changed
-        if (motor.isConnected()) {
+        // Handle disable/enable requests
+        if (wantDisable && motor.isConnected()) {
+            motor.disable();
+            lastCommandedRpm = 0.0;
+        }
+        if (wantEnable && motor.isConnected()) {
+            motor.enable();
+        }
+
+        // Send velocity command if target changed and motor is enabled
+        if (motor.isConnected() && motor.isEnabled()) {
             if (fabs(target - lastCommandedRpm) > RPM_CHANGE_THRESHOLD) {
                 if (motor.setVelocity(target)) {
                     lastCommandedRpm = target;
@@ -77,10 +92,11 @@ int main() {
             }
         }
 
-        // Update connection state
+        // Update connection/enable state
         {
             std::lock_guard<std::mutex> lock(g_state.mtx);
             g_state.motorConnected = motor.isConnected();
+            g_state.motorEnabled = motor.isEnabled();
         }
 
         // Reconnect if disconnected

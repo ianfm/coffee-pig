@@ -128,6 +128,19 @@ void SocketServer::handleClient(int clientFd) {
             m_state.targetRpm = 0.0;
         }
         response = "OK " + formatStatus() + "\n";
+    } else if (strncmp(buf, "DISABLE", 7) == 0) {
+        {
+            std::lock_guard<std::mutex> lock(m_state.mtx);
+            m_state.targetRpm = 0.0;
+            m_state.disableRequested = true;
+        }
+        response = "OK " + formatStatus() + "\n";
+    } else if (strncmp(buf, "ENABLE", 6) == 0) {
+        {
+            std::lock_guard<std::mutex> lock(m_state.mtx);
+            m_state.enableRequested = true;
+        }
+        response = "OK " + formatStatus() + "\n";
     } else {
         response = "ERR unknown command\n";
     }
@@ -139,10 +152,11 @@ void SocketServer::handleClient(int clientFd) {
 std::string SocketServer::formatStatus() {
     std::lock_guard<std::mutex> lock(m_state.mtx);
     char buf[128];
-    snprintf(buf, sizeof(buf), "%.1f %.1f %d %d",
+    snprintf(buf, sizeof(buf), "%.1f %.1f %d %d %d",
              m_state.targetRpm,
              m_state.commandedRpm,
              m_state.motorConnected ? 1 : 0,
-             m_state.hasAlert ? 1 : 0);
+             m_state.hasAlert ? 1 : 0,
+             m_state.motorEnabled ? 1 : 0);
     return std::string(buf);
 }

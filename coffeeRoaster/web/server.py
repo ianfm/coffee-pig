@@ -42,13 +42,23 @@ def daemon_command(cmd: str, timeout: float = 2.0) -> dict:
 
     if data.startswith("OK "):
         parts = data[3:].split()
-        if len(parts) >= 4:
+        if len(parts) >= 5:
             return {
                 "ok": True,
                 "targetRpm": float(parts[0]),
                 "commandedRpm": float(parts[1]),
                 "motorConnected": parts[2] == "1",
                 "hasAlert": parts[3] == "1",
+                "motorEnabled": parts[4] == "1",
+            }
+        elif len(parts) >= 4:
+            return {
+                "ok": True,
+                "targetRpm": float(parts[0]),
+                "commandedRpm": float(parts[1]),
+                "motorConnected": parts[2] == "1",
+                "hasAlert": parts[3] == "1",
+                "motorEnabled": True,
             }
         return {"ok": True, "raw": data}
     elif data.startswith("ERR "):
@@ -96,6 +106,16 @@ def api_speed():
 @app.route("/api/stop", methods=["POST"])
 def api_stop():
     return jsonify(daemon_command("STOP"))
+
+
+@app.route("/api/disable", methods=["POST"])
+def api_disable():
+    return jsonify(daemon_command("DISABLE"))
+
+
+@app.route("/api/enable", methods=["POST"])
+def api_enable():
+    return jsonify(daemon_command("ENABLE"))
 
 
 @app.route("/api/presets", methods=["GET"])

@@ -103,6 +103,8 @@
   .action-btn:active { opacity: 0.7; }
   .btn-start { background: var(--green); color: #fff; }
   .btn-stop  { background: var(--red); color: #fff; }
+  .btn-disable { background: #555; color: var(--muted); font-size: 1em; padding: 12px; }
+  .btn-enable  { background: var(--accent); color: #000; font-size: 1em; padding: 12px; }
 
   /* Presets */
   .preset-grid {
@@ -192,6 +194,7 @@
 </div>
 
 <button id="actionBtn" class="action-btn btn-start" onclick="toggleMotor()">START</button>
+<button id="disableBtn" class="action-btn btn-disable" onclick="toggleDisable()">DISABLE MOTOR</button>
 
 <div class="card">
   <div class="card-title">Presets</div>
@@ -227,6 +230,7 @@ let timerInterval = null;
 let timerRemaining = 0;
 let timerRunning = false;
 let lastSetRpm = 0; // speed before STOP, to resume with START
+let motorEnabled = false;
 
 // --- API helpers ---
 async function api(url, opts) {
@@ -283,6 +287,16 @@ function updateFromStatus(s) {
     btn.textContent = 'START';
     btn.className = 'action-btn btn-start';
   }
+
+  motorEnabled = s.motorEnabled !== false;
+  const disBtn = document.getElementById('disableBtn');
+  if (motorEnabled) {
+    disBtn.textContent = 'DISABLE MOTOR';
+    disBtn.className = 'action-btn btn-disable';
+  } else {
+    disBtn.textContent = 'ENABLE MOTOR';
+    disBtn.className = 'action-btn btn-enable';
+  }
 }
 
 // --- Speed controls ---
@@ -312,14 +326,27 @@ document.getElementById('btnMinus').addEventListener('click', () => {
   queueSend(v);
 });
 
-// --- Start / Stop ---
+// --- Start / Stop / Disable ---
 function toggleMotor() {
   if (isRunning) {
     lastSetRpm = currentTarget;
     stopMotor();
   } else {
+    if (!motorEnabled) {
+      api('/api/enable', {method: 'POST'}).then(r => { if (r.ok) updateFromStatus(r); });
+    }
     let rpm = lastSetRpm > 0 ? lastSetRpm : parseFloat(rpmInput.value) || 15;
     queueSend(rpm);
+  }
+}
+
+async function toggleDisable() {
+  if (motorEnabled) {
+    const res = await api('/api/disable', {method: 'POST'});
+    if (res.ok) updateFromStatus(res);
+  } else {
+    const res = await api('/api/enable', {method: 'POST'});
+    if (res.ok) updateFromStatus(res);
   }
 }
 
