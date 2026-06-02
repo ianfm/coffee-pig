@@ -1,0 +1,18 @@
+[Unit]
+Description=Coffee roaster drum motor daemon
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/coffee-roaster
+Restart=on-failure
+RestartSec=5
+User=ian
+Group=dialout
+RuntimeDirectory=coffee-roaster
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

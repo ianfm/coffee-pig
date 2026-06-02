@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Coffee Roaster</title>
+<style>
+  :root {
+    --bg: #1a1a1a; --card: #252525; --accent: #d4a056;
+    --green: #4caf50; --red: #e53935; --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text);
+    max-width: 480px; margin: 0 auto; padding: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Header */
+  .header { text-align: center; padding: 12px 0 8px; }
+  .header h1 { font-size: 1.3em; color: var(--accent); letter-spacing: 0.05em; }
+  .status-row {
+    display: flex; justify-content: center; gap: 16px;
+    margin-top: 6px; font-size: 0.85em;
+  }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; margin-right: 4px; vertical-align: middle;
+  }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.err { background: var(--red); }
+  .status-dot.warn { background: #ff9800; }
+
+  /* RPM Display */
+  .rpm-display {
+    text-align: center; padding: 20px 0;
+  }
+  .rpm-value {
+    font-size: 4em; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: #fff; line-height: 1;
+  }
+  .rpm-label { color: var(--muted); font-size: 1.1em; margin-top: 4px; }
+
+  /* Card */
+  .card {
+    background: var(--card); border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* Slider */
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 36px;
+    background: transparent; margin: 4px 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; background: #444; border-radius: 3px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 32px; height: 32px;
+    background: var(--accent); border-radius: 50%;
+    margin-top: -13px; cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 6px; background: #444; border-radius: 3px; border: none;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 50%; border: none; cursor: pointer;
+  }
+
+  /* Fine control row */
+  .fine-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; margin-top: 10px;
+  }
+  .fine-btn {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 2px solid var(--accent); background: transparent;
+    color: var(--accent); font-size: 1.4em; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .fine-btn:active { background: var(--accent); color: #000; }
+  .rpm-input {
+    width: 80px; text-align: center; font-size: 1.2em;
+    background: #333; border: 1px solid #555; border-radius: 8px;
+    color: #fff; padding: 8px;
+  }
+  .rpm-input:focus { outline: 2px solid var(--accent); }
+
+  /* Start / Stop */
+  .action-btn {
+    display: block; width: 100%; padding: 18px;
+    border: none; border-radius: 12px;
+    font-size: 1.3em; font-weight: 700; letter-spacing: 0.05em;
+    cursor: pointer; margin-bottom: 12px; transition: opacity 0.15s;
+  }
+  .action-btn:active { opacity: 0.7; }
+  .btn-start { background: var(--green); color: #fff; }
+  .btn-stop  { background: var(--red); color: #fff; }
+
+  /* Presets */
+  .preset-grid {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .preset-chip {
+    padding: 10px 16px; border-radius: 8px;
+    background: #333; border: 1px solid #555;
+    color: var(--text); font-size: 0.95em; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preset-chip:active { background: var(--accent); color: #000; }
+  .preset-chip .rpm-tag { color: var(--muted); font-size: 0.8em; }
+  .preset-chip .del {
+    color: var(--red); font-weight: 700; margin-left: 4px;
+    font-size: 1.1em; padding: 0 4px; cursor: pointer;
+  }
+  .preset-add {
+    padding: 10px 16px; border-radius: 8px;
+    background: transparent; border: 1px dashed #555;
+    color: var(--muted); cursor: pointer; font-size: 0.95em;
+  }
+
+  /* Timer */
+  .timer-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .timer-display {
+    font-size: 2em; font-weight: 700; font-variant-numeric: tabular-nums;
+    flex: 1; text-align: center;
+  }
+  .timer-btn {
+    padding: 10px 20px; border-radius: 8px; border: none;
+    font-size: 1em; font-weight: 600; cursor: pointer;
+  }
+  .timer-btn:active { opacity: 0.7; }
+  .timer-set-row {
+    display: flex; gap: 8px; margin-top: 10px; align-items: center;
+  }
+  .timer-set-row input {
+    width: 60px; text-align: center; font-size: 1.1em;
+    background: #333; border: 1px solid #555; border-radius: 8px;
+    color: #fff; padding: 8px;
+  }
+  .timer-set-row input:focus { outline: 2px solid var(--accent); }
+  .timer-set-row label { color: var(--muted); font-size: 0.85em; }
+  .timer-opt {
+    margin-top: 10px; display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 0.85em;
+  }
+  .timer-opt input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .timer-alert { display: none; color: var(--red); font-weight: 700; text-align: center; margin-top: 8px; font-size: 1.1em; }
+
+  /* Alerts banner */
+  .alert-banner {
+    display: none; background: var(--red); color: #fff;
+    padding: 10px; border-radius: 8px; text-align: center;
+    margin-bottom: 12px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>COFFEE ROASTER</h1>
+  <div class="status-row">
+    <span><span id="daemonDot" class="status-dot err"></span><span id="daemonLabel">Daemon</span></span>
+    <span><span id="motorDot" class="status-dot err"></span><span id="motorLabel">Motor</span></span>
+  </div>
+</div>
+
+<div id="alertBanner" class="alert-banner">Motor alert detected</div>
+
+<div class="rpm-display">
+  <div id="rpmValue" class="rpm-value">0.0</div>
+  <div class="rpm-label">RPM</div>
+</div>
+
+<div class="card">
+  <div class="card-title">Speed Control</div>
+  <input type="range" id="rpmSlider" min="0" max="60" step="0.5" value="0">
+  <div class="fine-row">
+    <button class="fine-btn" id="btnMinus">-</button>
+    <input type="number" class="rpm-input" id="rpmInput" min="0" max="60" step="0.5" value="0">
+    <button class="fine-btn" id="btnPlus">+</button>
+  </div>
+</div>
+
+<button id="actionBtn" class="action-btn btn-start" onclick="toggleMotor()">START</button>
+
+<div class="card">
+  <div class="card-title">Presets</div>
+  <div class="preset-grid" id="presetGrid"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Timer</div>
+  <div class="timer-row">
+    <button class="timer-btn" style="background:#555;color:#fff" onclick="timerAction()" id="timerBtn">Start</button>
+    <div class="timer-display" id="timerDisplay">00:00</div>
+    <button class="timer-btn" style="background:#333;color:var(--muted)" onclick="timerReset()">Reset</button>
+  </div>
+  <div class="timer-set-row">
+    <input type="number" id="timerMin" min="0" max="99" value="12" placeholder="min">
+    <label>min</label>
+    <input type="number" id="timerSec" min="0" max="59" value="0" placeholder="sec">
+    <label>sec</label>
+  </div>
+  <div class="timer-opt">
+    <input type="checkbox" id="timerAutoStop">
+    <label for="timerAutoStop">Auto-stop motor when timer ends</label>
+  </div>
+  <div class="timer-alert" id="timerAlert">TIME'S UP</div>
+</div>
+
+<script>
+// --- State ---
+let currentTarget = 0;
+let isRunning = false;
+let presets = [];
+let timerInterval = null;
+let timerRemaining = 0;
+let timerRunning = false;
+let lastSetRpm = 0; // speed before STOP, to resume with START
+
+// --- API helpers ---
+async function api(url, opts) {
+  try {
+    const r = await fetch(url, opts);
+    return await r.json();
+  } catch(e) {
+    return {ok: false, error: 'Network error'};
+  }
+}
+
+async function setSpeed(rpm) {
+  rpm = Math.max(0, Math.min(60, parseFloat(rpm) || 0));
+  const res = await api('/api/speed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rpm})
+  });
+  if (res.ok) updateFromStatus(res);
+  return res;
+}
+
+async function stopMotor() {
+  const res = await api('/api/stop', {method: 'POST'});
+  if (res.ok) updateFromStatus(res);
+  return res;
+}
+
+// --- UI update from daemon status ---
+function updateFromStatus(s) {
+  if (!s.ok) {
+    document.getElementById('daemonDot').className = 'status-dot err';
+    document.getElementById('daemonLabel').textContent = 'Daemon offline';
+    return;
+  }
+  document.getElementById('daemonDot').className = 'status-dot ok';
+  document.getElementById('daemonLabel').textContent = 'Daemon';
+
+  document.getElementById('motorDot').className = s.motorConnected ? 'status-dot ok' : 'status-dot err';
+  document.getElementById('motorLabel').textContent = s.motorConnected ? 'Motor' : 'Motor disconnected';
+
+  const banner = document.getElementById('alertBanner');
+  banner.style.display = s.hasAlert ? 'block' : 'none';
+
+  currentTarget = s.targetRpm;
+  document.getElementById('rpmValue').textContent = s.targetRpm.toFixed(1);
+
+  isRunning = s.targetRpm > 0;
+  const btn = document.getElementById('actionBtn');
+  if (isRunning) {
+    btn.textContent = 'STOP';
+    btn.className = 'action-btn btn-stop';
+  } else {
+    btn.textContent = 'START';
+    btn.className = 'action-btn btn-start';
+  }
+}
+
+// --- Speed controls ---
+const slider = document.getElementById('rpmSlider');
+const rpmInput = document.getElementById('rpmInput');
+
+let sendTimeout = null;
+function queueSend(rpm) {
+  // Update display immediately, debounce the network call
+  document.getElementById('rpmValue').textContent = parseFloat(rpm).toFixed(1);
+  slider.value = rpm;
+  rpmInput.value = rpm;
+  lastSetRpm = rpm;
+  clearTimeout(sendTimeout);
+  sendTimeout = setTimeout(() => setSpeed(rpm), 100);
+}
+
+slider.addEventListener('input', () => queueSend(slider.value));
+rpmInput.addEventListener('change', () => queueSend(rpmInput.value));
+
+document.getElementById('btnPlus').addEventListener('click', () => {
+  let v = Math.min(60, parseFloat(rpmInput.value || 0) + 0.5);
+  queueSend(v);
+});
+document.getElementById('btnMinus').addEventListener('click', () => {
+  let v = Math.max(0, parseFloat(rpmInput.value || 0) - 0.5);
+  queueSend(v);
+});
+
+// --- Start / Stop ---
+function toggleMotor() {
+  if (isRunning) {
+    lastSetRpm = currentTarget;
+    stopMotor();
+  } else {
+    let rpm = lastSetRpm > 0 ? lastSetRpm : parseFloat(rpmInput.value) || 15;
+    queueSend(rpm);
+  }
+}
+
+// --- Presets ---
+async function loadPresets() {
+  presets = await api('/api/presets');
+  if (!Array.isArray(presets)) presets = [];
+  renderPresets();
+}
+
+function renderPresets() {
+  const grid = document.getElementById('presetGrid');
+  grid.innerHTML = '';
+  presets.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'preset-chip';
+    chip.innerHTML = `${p.name} <span class="rpm-tag">${p.rpm}</span><span class="del" onclick="event.stopPropagation();deletePreset('${p.name}')">&times;</span>`;
+    chip.onclick = () => queueSend(p.rpm);
+    grid.appendChild(chip);
+  });
+  const addBtn = document.createElement('div');
+  addBtn.className = 'preset-add';
+  addBtn.textContent = '+ Save current';
+  addBtn.onclick = savePreset;
+  grid.appendChild(addBtn);
+}
+
+async function savePreset() {
+  const name = prompt('Preset name:');
+  if (!name) return;
+  const rpm = parseFloat(rpmInput.value) || 0;
+  await api('/api/presets', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, rpm})
+  });
+  loadPresets();
+}
+
+async function deletePreset(name) {
+  await api('/api/presets/' + encodeURIComponent(name), {method: 'DELETE'});
+  loadPresets();
+}
+
+// --- Timer ---
+function timerAction() {
+  if (timerRunning) {
+    // Pause
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('timerBtn').textContent = 'Resume';
+  } else {
+    // Start or resume
+    if (timerRemaining <= 0) {
+      const m = parseInt(document.getElementById('timerMin').value) || 0;
+      const s = parseInt(document.getElementById('timerSec').value) || 0;
+      timerRemaining = m * 60 + s;
+      if (timerRemaining <= 0) return;
+    }
+    document.getElementById('timerAlert').style.display = 'none';
+    timerRunning = true;
+    document.getElementById('timerBtn').textContent = 'Pause';
+    timerInterval = setInterval(timerTick, 1000);
+  }
+}
+
+function timerTick() {
+  timerRemaining--;
+  renderTimer();
+  if (timerRemaining <= 0) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('timerBtn').textContent = 'Start';
+    document.getElementById('timerAlert').style.display = 'block';
+    // Audio alert
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.3, 0.6].forEach(t => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.value = 0.3;
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.15);
+      });
+    } catch(e) {}
+    // Auto-stop
+    if (document.getElementById('timerAutoStop').checked) {
+      stopMotor();
+    }
+  }
+}
+
+function timerReset() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerRemaining = 0;
+  renderTimer();
+  document.getElementById('timerBtn').textContent = 'Start';
+  document.getElementById('timerAlert').style.display = 'none';
+}
+
+function renderTimer() {
+  const m = Math.floor(timerRemaining / 60);
+  const s = timerRemaining % 60;
+  document.getElementById('timerDisplay').textContent =
+    String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+// --- SSE live status ---
+function connectSSE() {
+  const es = new EventSource('/api/status/stream');
+  es.onmessage = (e) => {
+    try { updateFromStatus(JSON.parse(e.data)); } catch(err) {}
+  };
+  es.onerror = () => {
+    document.getElementById('daemonDot').className = 'status-dot err';
+    document.getElementById('daemonLabel').textContent = 'Daemon offline';
+    es.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// --- Init ---
+loadPresets();
+connectSSE();
+renderTimer();
+</script>
+</body>
+</html>
