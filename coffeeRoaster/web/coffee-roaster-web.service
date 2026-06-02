@@ -1,6 +1,5 @@
 [Unit]
 Description=Coffee roaster web controller
-After=network.target
 
 [Service]
 Type=simple
@@ -8,6 +7,8 @@ ExecStart=/usr/bin/python3 /opt/coffee-roaster/web/server.py
 WorkingDirectory=/opt/coffee-roaster/web
 Restart=on-failure
 RestartSec=3
+StartLimitIntervalSec=300
+StartLimitBurst=10
 # Set User= to your username
 #User=
 StandardOutput=journal

@@ -1,12 +1,13 @@
 [Unit]
 Description=Coffee roaster drum motor daemon
-After=network.target
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/coffee-roaster
 Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=10
 # Set User= to your username (must be in the dialout group)
 #User=
 Group=dialout
