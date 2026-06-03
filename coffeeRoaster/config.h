@@ -1,7 +1,7 @@
 #pragma once
 
 // Motor parameters
-constexpr double MAX_RPM = 300.0;               // Motor shaft max (e.g. 30 RPM output at 10:1)
+constexpr double MAX_RPM = 1000.0;              // Motor shaft max (100 RPM output at 10:1)
 constexpr double ACC_LIM_RPM_PER_SEC = 100.0;   // Gentle acceleration for a loaded drum
 constexpr double RPM_CHANGE_THRESHOLD = 0.1;    // Min change to issue new command
 
