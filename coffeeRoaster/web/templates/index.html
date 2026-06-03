@@ -241,7 +241,7 @@ let pendingSend = false;
 // All UI is in output RPM. Daemon speaks motor shaft RPM.
 // motorRpm = outputRpm * ratio
 let gearRatio = parseFloat(localStorage.getItem('gearRatio')) || 10;
-const MAX_MOTOR_RPM = 60; // from config.h
+const MAX_MOTOR_RPM = 300; // from config.h
 
 const ratioInput = document.getElementById('ratioInput');
 ratioInput.value = gearRatio;
