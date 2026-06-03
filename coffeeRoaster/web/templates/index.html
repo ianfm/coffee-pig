@@ -178,15 +178,15 @@
 
 <div class="rpm-display">
   <div id="rpmValue" class="rpm-value">0.0</div>
-  <div class="rpm-label">RPM</div>
+  <div class="rpm-label">RPM (output)</div>
 </div>
 
 <div class="card">
   <div class="card-title">Speed Control</div>
-  <input type="range" id="rpmSlider" min="0" max="60" step="0.5" value="0">
+  <input type="range" id="rpmSlider" min="0" max="6" step="0.1" value="0">
   <div class="fine-row">
     <button class="fine-btn" id="btnMinus">-</button>
-    <input type="number" class="rpm-input" id="rpmInput" min="0" max="60" step="0.5" value="0">
+    <input type="number" class="rpm-input" id="rpmInput" min="0" max="6" step="0.1" value="0">
     <button class="fine-btn" id="btnPlus">+</button>
   </div>
 </div>
@@ -218,6 +218,15 @@
   <div class="timer-alert" id="timerAlert">TIME'S UP</div>
 </div>
 
+<div class="card">
+  <div class="card-title">Gear Ratio</div>
+  <div class="fine-row">
+    <label style="color:var(--muted);font-size:0.9em">Reduction</label>
+    <input type="number" class="rpm-input" id="ratioInput" min="1" max="200" step="0.1" value="10">
+    <label style="color:var(--muted);font-size:0.9em">: 1</label>
+  </div>
+</div>
+
 <script>
 // --- State ---
 let isRunning = false;
@@ -225,8 +234,40 @@ let presets = [];
 let timerInterval = null;
 let timerRemaining = 0;
 let timerRunning = false;
-let desiredRpm = 15; // what the user has dialed in (persists across stop/start)
-let pendingSend = false; // true while a command is in-flight
+let desiredOutputRpm = 1.5; // output shaft RPM (persists across stop/start)
+let pendingSend = false;
+
+// --- Gear ratio ---
+// All UI is in output RPM. Daemon speaks motor shaft RPM.
+// motorRpm = outputRpm * ratio
+let gearRatio = parseFloat(localStorage.getItem('gearRatio')) || 10;
+const MAX_MOTOR_RPM = 60; // from config.h
+
+const ratioInput = document.getElementById('ratioInput');
+ratioInput.value = gearRatio;
+ratioInput.addEventListener('change', () => {
+  gearRatio = Math.max(1, parseFloat(ratioInput.value) || 10);
+  ratioInput.value = gearRatio;
+  localStorage.setItem('gearRatio', gearRatio);
+  updateSliderLimits();
+});
+
+function outputToMotor(outputRpm) { return outputRpm * gearRatio; }
+function motorToOutput(motorRpm) { return motorRpm / gearRatio; }
+function maxOutputRpm() { return MAX_MOTOR_RPM / gearRatio; }
+
+function updateSliderLimits() {
+  const max = maxOutputRpm();
+  slider.max = max;
+  slider.step = max > 10 ? 0.5 : 0.1;
+  rpmInput.max = max;
+  rpmInput.step = slider.step;
+  // Clamp current value
+  if (desiredOutputRpm > max) {
+    desiredOutputRpm = max;
+    updateDialUI(desiredOutputRpm);
+  }
+}
 
 // --- API helpers ---
 async function api(url, opts) {
@@ -238,12 +279,13 @@ async function api(url, opts) {
   }
 }
 
-async function sendSpeed(rpm) {
+async function sendSpeed(outputRpm) {
   pendingSend = true;
+  const motorRpm = outputToMotor(outputRpm);
   const res = await api('/api/speed', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({rpm})
+    body: JSON.stringify({rpm: motorRpm})
   });
   pendingSend = false;
   if (res.ok) updateFromStatus(res);
@@ -273,9 +315,9 @@ function updateFromStatus(s) {
 
   document.getElementById('alertBanner').style.display = s.hasAlert ? 'block' : 'none';
 
-  // Don't let SSE overwrite the display while the user is actively adjusting
   if (!pendingSend) {
-    document.getElementById('rpmValue').textContent = s.targetRpm.toFixed(1);
+    const outputRpm = motorToOutput(s.targetRpm);
+    document.getElementById('rpmValue').textContent = outputRpm.toFixed(1);
     isRunning = s.targetRpm > 0;
     updateButton();
   }
@@ -295,15 +337,18 @@ function updateButton() {
 // --- Speed controls ---
 const slider = document.getElementById('rpmSlider');
 const rpmInput = document.getElementById('rpmInput');
+updateSliderLimits();
 
-// Update the dial UI without sending a command (user is choosing a speed)
-function updateDial(rpm) {
-  rpm = Math.max(0, Math.min(60, parseFloat(rpm) || 0));
-  desiredRpm = rpm;
+function updateDialUI(rpm) {
   slider.value = rpm;
   rpmInput.value = rpm;
   document.getElementById('rpmValue').textContent = rpm.toFixed(1);
-  // If motor is already running, send the new speed live
+}
+
+function updateDial(rpm) {
+  rpm = Math.max(0, Math.min(maxOutputRpm(), parseFloat(rpm) || 0));
+  desiredOutputRpm = rpm;
+  updateDialUI(rpm);
   if (isRunning) {
     clearTimeout(liveTimeout);
     liveTimeout = setTimeout(() => sendSpeed(rpm), 100);
@@ -315,10 +360,10 @@ slider.addEventListener('input', () => updateDial(slider.value));
 rpmInput.addEventListener('change', () => updateDial(rpmInput.value));
 
 document.getElementById('btnPlus').addEventListener('click', () => {
-  updateDial(Math.min(60, desiredRpm + 0.5));
+  updateDial(Math.min(maxOutputRpm(), desiredOutputRpm + parseFloat(slider.step)));
 });
 document.getElementById('btnMinus').addEventListener('click', () => {
-  updateDial(Math.max(0, desiredRpm - 0.5));
+  updateDial(Math.max(0, desiredOutputRpm - parseFloat(slider.step)));
 });
 
 // --- Start / Stop ---
@@ -328,7 +373,7 @@ function toggleMotor() {
     updateButton();
     sendStop();
   } else {
-    let rpm = desiredRpm > 0 ? desiredRpm : 15;
+    let rpm = desiredOutputRpm > 0 ? desiredOutputRpm : 1.5;
     isRunning = true;
     updateButton();
     document.getElementById('rpmValue').textContent = rpm.toFixed(1);
@@ -350,7 +395,7 @@ function renderPresets() {
     const chip = document.createElement('div');
     chip.className = 'preset-chip';
     chip.innerHTML = `${p.name} <span class="rpm-tag">${p.rpm}</span><span class="del" onclick="event.stopPropagation();deletePreset('${p.name}')">&times;</span>`;
-    chip.onclick = () => queueSend(p.rpm);
+    chip.onclick = () => updateDial(p.rpm);
     grid.appendChild(chip);
   });
   const addBtn = document.createElement('div');
@@ -363,7 +408,7 @@ function renderPresets() {
 async function savePreset() {
   const name = prompt('Preset name:');
   if (!name) return;
-  const rpm = parseFloat(rpmInput.value) || 0;
+  const rpm = desiredOutputRpm;
   await api('/api/presets', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -422,7 +467,7 @@ function timerTick() {
     } catch(e) {}
     // Auto-stop
     if (document.getElementById('timerAutoStop').checked) {
-      stopMotor();
+      sendStop();
     }
   }
 }
