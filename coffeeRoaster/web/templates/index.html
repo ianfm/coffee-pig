@@ -162,6 +162,31 @@
     padding: 10px; border-radius: 8px; text-align: center;
     margin-bottom: 12px; font-weight: 600;
   }
+
+  /* Reconnect button */
+  .reconnect-btn {
+    display: none; width: 100%; padding: 14px;
+    border: 2px solid #ff9800; border-radius: 12px;
+    background: transparent; color: #ff9800;
+    font-size: 1.1em; font-weight: 600; cursor: pointer;
+    margin-bottom: 12px; transition: opacity 0.15s;
+  }
+  .reconnect-btn:active { background: #ff9800; color: #000; }
+  .reconnect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Reverse toggle */
+  .reverse-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; margin-top: 10px;
+  }
+  .reverse-btn {
+    padding: 10px 24px; border-radius: 8px;
+    border: 2px solid #555; background: transparent;
+    color: var(--text); font-size: 1em; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .reverse-btn.active { border-color: var(--accent); color: var(--accent); }
+  .reverse-btn:active { opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -175,6 +200,7 @@
 </div>
 
 <div id="alertBanner" class="alert-banner">Motor alert detected</div>
+<button id="reconnectBtn" class="reconnect-btn" onclick="reconnectMotor()">RECONNECT MOTOR</button>
 
 <div class="rpm-display">
   <div id="rpmValue" class="rpm-value">0.0</div>
@@ -183,6 +209,10 @@
 
 <div class="card">
   <div class="card-title">Speed Control</div>
+  <div class="reverse-row">
+    <button class="reverse-btn active" id="btnFwd" onclick="setDirection(1)">FWD</button>
+    <button class="reverse-btn" id="btnRev" onclick="setDirection(-1)">REV</button>
+  </div>
   <input type="range" id="rpmSlider" min="0" max="6" step="0.1" value="0">
   <div class="fine-row">
     <button class="fine-btn" id="btnMinus">-</button>
@@ -235,6 +265,7 @@ let timerInterval = null;
 let timerRemaining = 0;
 let timerRunning = false;
 let desiredOutputRpm = 1.5; // output shaft RPM (persists across stop/start)
+let direction = 1; // +1 forward, -1 reverse
 let pendingSend = false;
 
 // --- Gear ratio ---
@@ -281,7 +312,7 @@ async function api(url, opts) {
 
 async function sendSpeed(outputRpm) {
   pendingSend = true;
-  const motorRpm = outputToMotor(outputRpm);
+  const motorRpm = outputToMotor(outputRpm) * direction;
   const res = await api('/api/speed', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -314,11 +345,14 @@ function updateFromStatus(s) {
   document.getElementById('motorLabel').textContent = s.motorConnected ? 'Motor' : 'Motor disconnected';
 
   document.getElementById('alertBanner').style.display = s.hasAlert ? 'block' : 'none';
+  const reconBtn = document.getElementById('reconnectBtn');
+  if (!reconBtn.disabled) reconBtn.style.display = s.motorConnected ? 'none' : 'block';
 
   if (!pendingSend) {
-    const outputRpm = motorToOutput(s.targetRpm);
+    const outputRpm = motorToOutput(Math.abs(s.targetRpm));
     document.getElementById('rpmValue').textContent = outputRpm.toFixed(1);
-    isRunning = s.targetRpm > 0;
+    if (s.targetRpm !== 0) setDirection(s.targetRpm > 0 ? 1 : -1);
+    isRunning = s.targetRpm !== 0;
     updateButton();
   }
 }
@@ -365,6 +399,25 @@ document.getElementById('btnPlus').addEventListener('click', () => {
 document.getElementById('btnMinus').addEventListener('click', () => {
   updateDial(Math.max(0, desiredOutputRpm - parseFloat(slider.step)));
 });
+
+// --- Direction ---
+function setDirection(dir) {
+  direction = dir;
+  document.getElementById('btnFwd').className = 'reverse-btn' + (dir === 1 ? ' active' : '');
+  document.getElementById('btnRev').className = 'reverse-btn' + (dir === -1 ? ' active' : '');
+  if (isRunning) sendSpeed(desiredOutputRpm);
+}
+
+// --- Reconnect ---
+async function reconnectMotor() {
+  const btn = document.getElementById('reconnectBtn');
+  btn.disabled = true;
+  btn.textContent = 'RECONNECTING...';
+  const res = await api('/api/reconnect', {method: 'POST'});
+  btn.disabled = false;
+  btn.textContent = 'RECONNECT MOTOR';
+  if (res.ok) updateFromStatus(res);
+}
 
 // --- Start / Stop ---
 function toggleMotor() {

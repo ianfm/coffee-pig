@@ -108,6 +108,11 @@ def api_stop():
     return jsonify(daemon_command("STOP"))
 
 
+@app.route("/api/reconnect", methods=["POST"])
+def api_reconnect():
+    return jsonify(daemon_command("RECONNECT", timeout=15.0))
+
+
 @app.route("/api/presets", methods=["GET"])
 def api_presets_list():
     return jsonify(load_presets())

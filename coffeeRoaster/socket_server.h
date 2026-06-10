@@ -10,6 +10,7 @@
 //   SET <rpm>\n   → OK <target> <commanded> <connected> <alert> <enabled>\n
 //   GET\n         → OK <target> <commanded> <connected> <alert> <enabled>\n
 //   STOP\n        → OK 0.0 <commanded> <connected> <alert> <enabled>\n
+//   RECONNECT\n   → OK ... (triggers motor re-init on next loop iteration)
 //   ERR <msg>\n   (on parse failure)
 //
 // SET 0 / STOP disables the motor. SET >0 auto-enables it.

@@ -50,6 +50,29 @@ int main() {
            (int)(1e6 / LOOP_PERIOD_US), MAX_RPM);
 
     while (g_state.running.load()) {
+        // Check for reconnect request from web UI
+        bool shouldReconnect;
+        {
+            std::lock_guard<std::mutex> lock(g_state.mtx);
+            shouldReconnect = g_state.reconnectRequested;
+            g_state.reconnectRequested = false;
+        }
+        if (shouldReconnect) {
+            printf("Reconnect requested via web UI.\n");
+            if (motor.reconnect()) {
+                lastCommandedRpm = 0.0;
+                std::lock_guard<std::mutex> lock(g_state.mtx);
+                g_state.motorConnected = true;
+                g_state.commandedRpm = 0.0;
+                g_state.hasAlert = false;
+                printf("Reconnected successfully.\n");
+            } else {
+                std::lock_guard<std::mutex> lock(g_state.mtx);
+                g_state.motorConnected = false;
+                fprintf(stderr, "Reconnect failed.\n");
+            }
+        }
+
         double target;
         {
             std::lock_guard<std::mutex> lock(g_state.mtx);
@@ -85,7 +108,7 @@ int main() {
             g_state.motorEnabled = motor.isEnabled();
         }
 
-        // Reconnect if disconnected
+        // Auto-reconnect if disconnected (no web request needed)
         if (!motor.isConnected()) {
             fprintf(stderr, "Motor disconnected, retrying in %ds...\n",
                     RECONNECT_DELAY_S);
@@ -97,7 +120,7 @@ int main() {
                 g_state.commandedRpm = 0.0;
                 printf("Reconnected.\n");
             }
-            continue; // skip the usleep since we already slept
+            continue;
         }
 
         usleep(LOOP_PERIOD_US);

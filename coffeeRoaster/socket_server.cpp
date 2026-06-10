@@ -111,9 +111,8 @@ void SocketServer::handleClient(int clientFd) {
         if (endp == buf + 4) {
             response = "ERR bad number\n";
         } else {
-            // Clamp to valid range
-            if (rpm < 0.0) rpm = 0.0;
             if (rpm > MAX_RPM) rpm = MAX_RPM;
+            if (rpm < -MAX_RPM) rpm = -MAX_RPM;
             {
                 std::lock_guard<std::mutex> lock(m_state.mtx);
                 m_state.targetRpm = rpm;
@@ -126,6 +125,12 @@ void SocketServer::handleClient(int clientFd) {
         {
             std::lock_guard<std::mutex> lock(m_state.mtx);
             m_state.targetRpm = 0.0;
+        }
+        response = "OK " + formatStatus() + "\n";
+    } else if (strncmp(buf, "RECONNECT", 9) == 0) {
+        {
+            std::lock_guard<std::mutex> lock(m_state.mtx);
+            m_state.reconnectRequested = true;
         }
         response = "OK " + formatStatus() + "\n";
     } else {

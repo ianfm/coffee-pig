@@ -75,8 +75,7 @@ bool MotorController::setVelocity(double rpm) {
         return false;
 
     try {
-        if (rpm <= 0.0) {
-            // Disable: stop and release the motor
+        if (rpm == 0.0) {
             if (m_enabled) {
                 m_node->Motion.MoveVelStart(0);
                 m_node->EnableReq(false);
