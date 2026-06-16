@@ -1,0 +1,4 @@
+luma.oled
+gpiozero
+lgpio
+Pillow

@@ -1,6 +1,16 @@
 # Coffee Roaster Controller
 
-Web-controlled drum motor speed for a coffee roaster. A C++ daemon commands a Teknic ClearPath-SC motor via the sFoundation SDK, and a Flask web server provides a phone-friendly UI.
+Web-controlled drum motor speed for a coffee roaster. A C++ daemon commands a Teknic ClearPath-SC motor via the sFoundation SDK, and a Flask web server provides a phone-friendly UI. An optional hardware panel (OLED + rotary knob + buttons) offers the same readout and speed control without a phone.
+
+## Architecture
+
+The C++ daemon is the single motor authority. It exposes a tiny text protocol over a Unix socket (`/run/coffee-roaster/motor.sock`). Everything else is a **client** of that socket, so clients can run side by side and the daemon serializes their commands:
+
+```
+                       Unix socket (GET / SET <rpm> / STOP)
+  coffee-roaster  <-------------------------------------------+--- coffee-roaster-web   (Flask UI)
+  (C++ motor daemon)                                          +--- coffee-roaster-panel (OLED + knob)
+```
 
 ## Prerequisites
 
@@ -26,12 +36,42 @@ sudo systemctl enable --now coffee-roaster coffee-roaster-web
 
 Open `http://<pi-ip>:8080` on your phone.
 
+## Hardware panel (optional)
+
+An I²C OLED, a rotary encoder with a push knob, and Confirm/Back buttons give a phone-free readout and speed control.
+
+**Wiring (BCM GPIO):**
+
+| Signal | Pi pin (BCM) |
+|---|---|
+| VCC | 3V3 |
+| SDA | GPIO2 |
+| SCL | GPIO3 |
+| Encoder A (TRA) | GPIO23 |
+| Encoder B (TRB) | GPIO24 |
+| Encoder push | GPIO25 |
+| Confirm | GPIO22 |
+| Back | GPIO27 |
+
+**Controls:** push the knob to enter edit mode, turn it to dial in an RPM, **Confirm** to apply or **Back** to cancel (an idle edit auto-cancels). The readout shows output-shaft RPM, just like the web UI.
+
+**Enable and install:**
+
+```bash
+sudo raspi-config nonint do_i2c 0        # enable I2C
+pip3 install --break-system-packages -r panel/requirements.txt
+sudo systemctl enable --now coffee-roaster-panel
+```
+
+Verify the OLED is detected with `i2cdetect -y 1` (expect `0x3c`). Pin assignments, the gear ratio, and the OLED controller (`sh1106` for 1.3", `ssd1306` for 0.96") are set in [panel/config.py](panel/config.py). Keep `GEAR_RATIO` in sync with the web UI's gear-ratio setting (the web stores its ratio in the browser, so the two can't share it automatically).
+
 ## Services
 
 | Service | What it does |
 |---|---|
 | `coffee-roaster` | Motor control daemon (C++, Unix socket at `/run/coffee-roaster/motor.sock`) |
 | `coffee-roaster-web` | Web UI (Flask on port 8080) |
+| `coffee-roaster-panel` | Hardware OLED + knob + buttons (Python) |
 
 ```bash
 # Check status
