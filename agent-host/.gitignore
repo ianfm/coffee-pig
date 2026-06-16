@@ -1,0 +1,22 @@
+# Secrets / credentials — never commit
+*.key
+*.pem
+id_ed25519*
+id_rsa*
+*authkey*
+.env
+.env.*
+.claude/.credentials.json
+
+# Local runtime / logs
+*.log
+inventory-*.txt
+roster*.md
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor / OS cruft
+.DS_Store
+*.swp

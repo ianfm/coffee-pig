@@ -52,7 +52,7 @@ off-limits → `tag:infra` (the agent has no rule to reach it).
 
 ### 2. Provision the agent Pi (on the Pi, over SSH)
 ```bash
-git clone <this-repo> && cd <repo>/agent-host
+git clone <your-repo-url> agent-host && cd agent-host
 sudo ./setup-agent-pi.sh
 ```
 
@@ -104,3 +104,7 @@ improve — bounded by your ACLs.
   fully-unattended runs).
 - **Audit:** `journalctl -u claude-remote-control`, Tailscale SSH session logging,
   and the agent's own transcript in the app.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
