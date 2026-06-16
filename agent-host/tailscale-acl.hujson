@@ -1,0 +1,47 @@
+// Tailnet policy for a bounded Claude agent.
+// Paste/merge into the ACL editor at https://login.tailscale.com/admin/acls
+// Goal: the agent node has WIDE-but-BOUNDED reach -- it can manage the devices
+// you tag, over the ports you list, and nothing else. SSH is governed centrally
+// by Tailscale SSH ACLs, so you don't distribute private keys.
+
+{
+  "tagOwners": {
+    "tag:agent":   ["autogroup:admin"], // the Pi running claude remote-control
+    "tag:devices": ["autogroup:admin"], // things the agent may manage (other Pis)
+    "tag:infra":   ["autogroup:admin"], // sensitive boxes the agent must NOT touch
+  },
+
+  "acls": [
+    // You reach everything (your normal admin access).
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["*:*"] },
+
+    // Agent -> managed devices: SSH + HTTP(S) + ICMP for discovery/health.
+    {
+      "action": "accept",
+      "src": ["tag:agent"],
+      "dst": [
+        "tag:devices:22",
+        "tag:devices:80",
+        "tag:devices:443",
+        "tag:devices:8080",
+      ],
+    },
+
+    // Agent is intentionally NOT granted any rule to tag:infra (default deny).
+  ],
+
+  // Central, key-less SSH: agent may SSH into managed devices as a low-priv user.
+  // "accept" (not "check") because a headless agent can't do interactive re-auth.
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["tag:agent"],
+      "dst": ["tag:devices"],
+      "users": ["agent", "pi"],
+    },
+  ],
+
+  "tests": [
+    { "src": "tag:agent", "accept": ["tag:devices:22"], "deny": ["tag:infra:22"] },
+  ],
+}

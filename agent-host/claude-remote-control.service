@@ -1,0 +1,32 @@
+[Unit]
+Description=Claude Code Remote Control agent
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude
+Group=claude
+# Working dir = where the agent starts; give it a scratch repo/workspace, not /
+WorkingDirectory=/home/claude/workspace
+# NOTE: confirm the binary path with `sudo -u claude which claude` and confirm
+# flags with `claude remote-control --help`. The base command is load-bearing;
+# --name is cosmetic (how the session shows up in the Claude app list).
+ExecStart=/home/claude/.local/bin/claude remote-control --name "%H-agent"
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=HOME=/home/claude
+Environment=LANG=en_US.UTF-8
+Environment=PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# --- Light hardening (the agent can still reach the LAN/tailnet) ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/claude
+ProtectHome=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

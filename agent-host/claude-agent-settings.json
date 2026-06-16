@@ -1,0 +1,40 @@
+{
+  "$comment": "Bounded autonomy for an unattended Claude Code agent on a Pi. Copy to ~/.claude/settings.json for the 'claude' user. Tune allow/deny to taste. Verify mode names against `claude --help` on your installed version.",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(tailscale status*)",
+      "Bash(tailscale ip*)",
+      "Bash(ip *)",
+      "Bash(arp *)",
+      "Bash(nmap -sn *)",
+      "Bash(ping *)",
+      "Bash(ssh *)",
+      "Bash(systemctl status *)",
+      "Bash(journalctl *)",
+      "Bash(uname *)",
+      "Bash(hostnamectl*)",
+      "Bash(git status*)",
+      "Bash(git log *)",
+      "Bash(git diff *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo rm *)",
+      "Bash(mkfs*)",
+      "Bash(dd *)",
+      "Bash(shutdown *)",
+      "Bash(reboot*)",
+      "Bash(tailscale down*)",
+      "Bash(tailscale logout*)",
+      "Edit(/etc/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.claude/**)",
+      "Read(~/.ssh/id_*)",
+      "Read(~/.claude/.credentials.json)"
+    ]
+  }
+}
