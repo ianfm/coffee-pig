@@ -42,7 +42,11 @@ DISPLAY_HEIGHT = 64
 # ---------------------------------------------------------------------------
 # Control behaviour
 # ---------------------------------------------------------------------------
-RPM_STEP = 0.5          # output RPM change per encoder detent
+RPM_PER_DETENT = 5.0    # output RPM change per physical click of the knob
+# Many detented encoders emit more than one quadrature step per physical click.
+# If one click moves the value by N*5 RPM, set this to N (commonly 1, 2, or 4).
+ENCODER_STEPS_PER_DETENT = 1
+UI_TICK_S = 0.02        # render/encoder poll period (~50 Hz); render is coalesced
 POLL_INTERVAL_S = 0.25  # how often the panel polls daemon status (~4 Hz)
 EDIT_TIMEOUT_S = 8.0    # auto-cancel an edit after this much inactivity
 BUTTON_BOUNCE_S = 0.05  # debounce window for the push buttons

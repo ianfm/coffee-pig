@@ -12,8 +12,11 @@ Controls:
   - Confirm button       -> commit the pending RPM, return to VIEW
   - Back button          -> discard the edit, return to VIEW
 
-The daemon is the single hardware authority and serializes every command, so
-running this alongside the web UI is safe with no extra locking on its side.
+Design note: input handlers do *no* slow work. The rotary encoder just
+accumulates counts in gpiozero; a single UI loop polls that count and redraws at
+a fixed cadence, coalescing a fast spin into one update. Rendering an I2C OLED
+takes tens of ms, so doing it per-detent (the old approach) built a multi-second
+backlog -- hence the lag/overshoot. Keep render out of the callbacks.
 """
 
 import signal
@@ -31,44 +34,22 @@ EDIT = "edit"
 
 
 class Panel:
-    def __init__(self, disp: display.Display):
+    def __init__(self, disp: display.Display, encoder: RotaryEncoder):
         self.disp = disp
+        self.encoder = encoder
         self.lock = threading.Lock()
         self.mode = VIEW
         self.status = {"ok": False}
         self.pending_output_rpm = 0.0
-        self.last_input_ts = 0.0
+        self.last_input = 0.0
+        self.last_steps = encoder.steps
+        self.dirty = True
         self._running = True
+        self._last_status_poll = 0.0
 
-    # -- rendering ----------------------------------------------------------
-
-    def _render_locked(self):
-        """Draw the screen for the current state. Caller must hold self.lock."""
-        if self.mode == EDIT:
-            self.disp.show_edit(self.pending_output_rpm)
-        else:
-            self.disp.show_view(self.status)
-
-    def render(self):
-        with self.lock:
-            self._render_locked()
-
-    # -- input callbacks (run on gpiozero's own threads) --------------------
-
-    def on_rotate(self, encoder: RotaryEncoder):
-        with self.lock:
-            if self.mode != EDIT:
-                return
-            step = encoder.steps  # signed accumulated detents since last reset
-            encoder.steps = 0
-            self.pending_output_rpm = _clamp(
-                self.pending_output_rpm + step * config.RPM_STEP,
-                0.0, config.max_output_rpm())
-            self.last_input_ts = time.monotonic()
-            self._render_locked()
+    # -- input callbacks (gpiozero threads): mutate state only, never render ---
 
     def on_push(self):
-        """Enter edit mode, seeded from the current target."""
         with self.lock:
             if self.mode == EDIT:
                 return
@@ -77,8 +58,8 @@ class Panel:
                 seed = self.status["targetRpm"] / config.GEAR_RATIO
             self.pending_output_rpm = _clamp(seed, 0.0, config.max_output_rpm())
             self.mode = EDIT
-            self.last_input_ts = time.monotonic()
-            self._render_locked()
+            self.last_input = time.monotonic()
+            self.dirty = True
 
     def on_confirm(self):
         with self.lock:
@@ -86,34 +67,71 @@ class Panel:
                 return
             motor_rpm = round(self.pending_output_rpm * config.GEAR_RATIO, 1)
             self.mode = VIEW
-        # Talk to the daemon outside the lock (network I/O may block briefly).
+            self.dirty = True
+        # Network I/O outside the lock.
         result = ipc.set_motor_rpm(motor_rpm)
         with self.lock:
             if result.get("ok"):
                 self.status = result
-            self._render_locked()
+            self.dirty = True
 
     def on_back(self):
         with self.lock:
             if self.mode != EDIT:
                 return
             self.mode = VIEW
-            self._render_locked()
+            self.dirty = True
 
-    # -- background status poller -------------------------------------------
+    # -- single UI loop: poll encoder + status, render at most once per tick ---
 
-    def poll_loop(self):
+    def ui_loop(self):
         while self._running:
-            status = ipc.get_status()
+            now = time.monotonic()
+
+            # Poll daemon status at its slower cadence (socket I/O, no lock held).
+            if now - self._last_status_poll >= config.POLL_INTERVAL_S:
+                self._last_status_poll = now
+                status = ipc.get_status()
+                with self.lock:
+                    if status != self.status:
+                        self.status = status
+                        if self.mode == VIEW:
+                            self.dirty = True
+
+            # Apply accumulated encoder motion, handle edit timeout, decide render.
             with self.lock:
-                self.status = status
-                if self.mode == VIEW:
-                    self._render_locked()
-                elif time.monotonic() - self.last_input_ts > config.EDIT_TIMEOUT_S:
-                    # Auto-cancel a stale edit (e.g. a bumped knob).
-                    self.mode = VIEW
-                    self._render_locked()
-            time.sleep(config.POLL_INTERVAL_S)
+                steps = self.encoder.steps
+                delta = steps - self.last_steps
+                self.last_steps = steps
+
+                if self.mode == EDIT:
+                    if delta != 0:
+                        rpm_delta = (delta / config.ENCODER_STEPS_PER_DETENT) \
+                            * config.RPM_PER_DETENT
+                        new_val = _clamp(self.pending_output_rpm + rpm_delta,
+                                         0.0, config.max_output_rpm())
+                        if new_val != self.pending_output_rpm:
+                            self.pending_output_rpm = new_val
+                            self.dirty = True
+                        self.last_input = now
+                    elif now - self.last_input > config.EDIT_TIMEOUT_S:
+                        self.mode = VIEW
+                        self.dirty = True
+
+                render = self.dirty
+                self.dirty = False
+                mode = self.mode
+                pending = self.pending_output_rpm
+                status = self.status
+
+            # Render outside the lock (I2C is slow).
+            if render:
+                if mode == EDIT:
+                    self.disp.show_edit(pending)
+                else:
+                    self.disp.show_view(status)
+
+            time.sleep(config.UI_TICK_S)
 
     def stop(self):
         self._running = False
@@ -124,15 +142,13 @@ def _clamp(value, lo, hi):
 
 
 def main():
+    encoder = RotaryEncoder(config.PIN_ENCODER_A, config.PIN_ENCODER_B,
+                            max_steps=0)
+
     disp = display.Display(display.make_device())
     disp.show_splash()
 
-    panel = Panel(disp)
-
-    # Rotary encoder: accumulate steps, react on rotation.
-    encoder = RotaryEncoder(config.PIN_ENCODER_A, config.PIN_ENCODER_B,
-                            max_steps=0)
-    encoder.when_rotated = lambda: panel.on_rotate(encoder)
+    panel = Panel(disp, encoder)
 
     push = Button(config.PIN_ENCODER_PUSH, bounce_time=config.BUTTON_BOUNCE_S)
     confirm = Button(config.PIN_CONFIRM, bounce_time=config.BUTTON_BOUNCE_S)
@@ -141,15 +157,10 @@ def main():
     confirm.when_pressed = panel.on_confirm
     back.when_pressed = panel.on_back
 
-    poller = threading.Thread(target=panel.poll_loop, daemon=True)
-    poller.start()
+    signal.signal(signal.SIGTERM, lambda *_: panel.stop())
+    signal.signal(signal.SIGINT, lambda *_: panel.stop())
 
-    stop_event = threading.Event()
-    signal.signal(signal.SIGTERM, lambda *_: stop_event.set())
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    stop_event.wait()
-
-    panel.stop()
+    panel.ui_loop()
 
 
 if __name__ == "__main__":
