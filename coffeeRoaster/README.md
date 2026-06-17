@@ -55,10 +55,11 @@ An I²C OLED, a rotary encoder with a push knob, and Confirm/Back buttons give a
 
 **Controls:** push the knob to enter edit mode, turn it to dial in an RPM, **Confirm** to apply or **Back** to cancel (an idle edit auto-cancels). The readout shows output-shaft RPM, just like the web UI.
 
-**Enable and install:**
+**Bring-up & testing:** see [panel/README.md](panel/README.md) for the full
+step-by-step (wiring, enabling I²C on **Raspberry Pi OS or Ubuntu**, permissions,
+a foreground test, and the systemd service). Quick version once I²C is enabled:
 
 ```bash
-sudo raspi-config nonint do_i2c 0        # enable I2C
 pip3 install --break-system-packages -r panel/requirements.txt
 sudo systemctl enable --now coffee-roaster-panel
 ```
