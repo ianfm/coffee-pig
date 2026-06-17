@@ -1,0 +1,19 @@
+[Unit]
+Description=Coffee roaster hardware panel (OLED + knob + buttons)
+After=coffee-roaster.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/coffee-roaster/panel/panel.py
+WorkingDirectory=/opt/coffee-roaster/panel
+Restart=on-failure
+RestartSec=3
+StartLimitIntervalSec=300
+StartLimitBurst=10
+# Set User= to your username
+#User=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,2 +1,4 @@
 *.o
 coffee-roaster
+__pycache__/
+*.pyc
