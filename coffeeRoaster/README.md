@@ -110,3 +110,13 @@ echo "GET" | socat - UNIX-CONNECT:/run/coffee-roaster/motor.sock
 echo "SET 15" | socat - UNIX-CONNECT:/run/coffee-roaster/motor.sock
 echo "STOP" | socat - UNIX-CONNECT:/run/coffee-roaster/motor.sock
 ```
+
+**Stop the motor** (without `socat`, using `nc`):
+
+```bash
+echo "STOP" | nc -U /run/coffee-roaster/motor.sock
+```
+
+Run as a user that can access the socket (mode `0660`, owned by the daemon's
+user) or use `sudo`. `STOP` sets the target to 0 and disables the motor — the
+same action as the web UI's STOP button.
