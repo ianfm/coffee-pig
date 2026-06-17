@@ -39,6 +39,16 @@ DISPLAY_CONTROLLER = "sh1106"  # "sh1106" (1.3") or "ssd1306" (0.96")
 DISPLAY_WIDTH = 128
 DISPLAY_HEIGHT = 64
 
+# TrueType fonts (the default PIL bitmap font is ~8px and unreadable across the
+# room). First existing path wins; falls back to PIL's default if none found.
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+]
+FONT_SIZE_BIG = 36     # the RPM number (fills most of a 64px-tall panel)
+FONT_SIZE_SMALL = 12   # headers / status footer
+
 # ---------------------------------------------------------------------------
 # Control behaviour
 # ---------------------------------------------------------------------------

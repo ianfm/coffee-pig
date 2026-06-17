@@ -14,7 +14,7 @@ The C++ daemon is the single motor authority. It exposes a tiny text protocol ov
 
 ## Prerequisites
 
-- Raspberry Pi 4 running Raspberry Pi OS
+- Raspberry Pi 4B running Ubuntu 24.04 (64-bit)
 - Teknic ClearPath-SC motor + SC4-HUB connected via USB
 - Python 3 with pip
 - User in the `dialout` group (`sudo usermod -aG dialout $USER`, then log out/in)
