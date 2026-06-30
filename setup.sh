@@ -182,17 +182,22 @@ echo -e "${GREEN}Running tests...${NC}"
 make test
 
 OLD_BIN_MD5=""
+OLD_WEB_MD5=""
 if [ -f /usr/local/bin/coffee-roaster ]; then
     OLD_BIN_MD5=$(md5sum /usr/local/bin/coffee-roaster | awk '{print $1}')
+fi
+if [ -f /opt/coffee-roaster/web/templates/index.html ]; then
+    OLD_WEB_MD5=$(md5sum /opt/coffee-roaster/web/templates/index.html | awk '{print $1}')
 fi
 
 echo "Installing services..."
 sudo make install
 
 NEW_BIN_MD5=$(md5sum /usr/local/bin/coffee-roaster | awk '{print $1}')
+NEW_WEB_MD5=$(md5sum /opt/coffee-roaster/web/templates/index.html | awk '{print $1}')
 
 # [6/6] Start/restart services
-if [ "$OLD_BIN_MD5" != "$NEW_BIN_MD5" ] || ! systemctl is-active --quiet coffee-roaster || ! systemctl is-active --quiet coffee-roaster-web; then
+if [ "$OLD_BIN_MD5" != "$NEW_BIN_MD5" ] || [ "$OLD_WEB_MD5" != "$NEW_WEB_MD5" ] || ! systemctl is-active --quiet coffee-roaster || ! systemctl is-active --quiet coffee-roaster-web; then
     echo -e "${GREEN}[6/6] Starting/restarting services...${NC}"
     sudo systemctl daemon-reload
     sudo systemctl enable coffee-roaster coffee-roaster-web
