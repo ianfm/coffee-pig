@@ -178,6 +178,9 @@ echo -e "${GREEN}[5/6] Compiling Coffee Roaster Daemon (incremental)...${NC}"
 cd "$REPO_ROOT"/coffeeRoaster
 make # Incremental build
 
+echo -e "${GREEN}Running tests...${NC}"
+make test
+
 OLD_BIN_MD5=""
 if [ -f /usr/local/bin/coffee-roaster ]; then
     OLD_BIN_MD5=$(md5sum /usr/local/bin/coffee-roaster | awk '{print $1}')

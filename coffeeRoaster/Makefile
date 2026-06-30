@@ -44,6 +44,10 @@ uninstall:
 	rm -rf /opt/coffee-roaster
 	systemctl daemon-reload
 
+.PHONY: test
+test:
+	python3 -m unittest discover -s web -p "test_*.py"
+
 .PHONY: clean
 clean:
 	rm -f $(OBJ_FILES)
