@@ -4,10 +4,10 @@ Automated setup, control, and diagnostics for a coffee roaster drum motor using 
 
 ## Setup & Installation
 
-Run the clean-slate install script to build the sFoundation SDK, the Exar USB driver, the motor daemon, and the Flask web service:
+Run the setup script to build the sFoundation SDK, the Exar USB driver, the motor daemon, and the Flask web service:
 
 ```bash
-./install_clean_slate.sh
+./setup.sh
 ```
 
 ## Uninstallation
@@ -15,7 +15,7 @@ Run the clean-slate install script to build the sFoundation SDK, the Exar USB dr
 To remove all binaries, system services, SDK libraries, and kernel drivers:
 
 ```bash
-./install_clean_slate.sh --uninstall
+./setup.sh --uninstall
 ```
 
 ## Architecture

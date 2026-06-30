@@ -1,11 +1,11 @@
 #!/bin/bash
-# install_clean_slate.sh
+# setup.sh
 #
 # Automated installation / uninstallation script for a clean-slate setup of the coffee-pig repo.
 # Run this script to build & install the sFoundation SDK, the Exar USB driver,
 # the motor daemon, and the Flask web service.
 #
-# Usage: ./install_clean_slate.sh [-u|--uninstall]
+# Usage: ./setup.sh [-u|--uninstall]
 
 set -euo pipefail
 
