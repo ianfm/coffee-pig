@@ -88,9 +88,22 @@ CURRENT_USER=$(whoami)
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_ROOT"
 
-echo -e "${GREEN}[1/6] Installing system prerequisites...${NC}"
-sudo apt update
-sudo apt install -y build-essential linux-headers-$(uname -r) python3-pip python3-flask socat
+# [1/6] Check prerequisites incrementally
+echo -e "${GREEN}[1/6] Checking system prerequisites...${NC}"
+MISSING_PKGS=()
+for pkg in build-essential linux-headers-$(uname -r) python3-pip python3-flask socat; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        MISSING_PKGS+=("$pkg")
+    fi
+done
+
+if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}Installing missing prerequisites: ${MISSING_PKGS[*]}...${NC}"
+    sudo apt update
+    sudo apt install -y "${MISSING_PKGS[@]}"
+else
+    echo "All system prerequisites are already installed."
+fi
 
 echo -e "${GREEN}[2/6] Setting up serial port groups...${NC}"
 if groups "$CURRENT_USER" | grep -q "\bdialout\b"; then
@@ -101,14 +114,17 @@ else
     echo -e "${YELLOW}[NOTE]: You will need to log out and log back in (or reboot) for group changes to take effect.${NC}"
 fi
 
-echo -e "${GREEN}[3/6] Building and installing sFoundation SDK...${NC}"
+# [3/6] Build sFoundation SDK incrementally
+echo -e "${GREEN}[3/6] Building sFoundation SDK (incremental)...${NC}"
 cd sFoundation/sFoundation
-make real_clean
-make
-echo "Installing libsFoundation20.so systemwide..."
-sudo cp libsFoundation20.so /usr/local/lib/
-sudo cp MNuserDriver20.xml /usr/local/lib/
-sudo ldconfig
+make # Incremental build
+INSTALLED_LIB="/usr/local/lib/libsFoundation20.so"
+if [ ! -f "$INSTALLED_LIB" ] || [ libsFoundation20.so -nt "$INSTALLED_LIB" ]; then
+    echo "Installing libsFoundation20.so systemwide..."
+    sudo cp libsFoundation20.so /usr/local/lib/
+    sudo cp MNuserDriver20.xml /usr/local/lib/
+    sudo ldconfig
+fi
 
 # Verify sFoundation installation
 if ldconfig -p | grep -q "libsFoundation20"; then
@@ -119,20 +135,25 @@ else
     sudo ldconfig
 fi
 
-echo -e "${GREEN}[4/6] Building and loading Teknic SC4-Hub USB Driver...${NC}"
+# [4/6] Build driver incrementally
+echo -e "${GREEN}[4/6] Building Teknic SC4-Hub USB Driver (incremental)...${NC}"
 cd "$REPO_ROOT"/Teknic_SC4Hub_USB_Driver/ExarKernelDriver
-make clean
-make
-echo "Installing Exar USB serial module..."
-sudo cp xr_usb_serial_common.ko /lib/modules/"$(uname -r)"/kernel/drivers/usb/serial/
-sudo depmod -a
+make # Incremental build
+INSTALLED_KO="/lib/modules/$(uname -r)/kernel/drivers/usb/serial/xr_usb_serial_common.ko"
+if [ ! -f "$INSTALLED_KO" ] || [ xr_usb_serial_common.ko -nt "$INSTALLED_KO" ] || ! lsmod | grep -q "xr_usb_serial_common"; then
+    echo "Installing Exar USB serial module..."
+    sudo mkdir -p "$(dirname "$INSTALLED_KO")"
+    sudo cp xr_usb_serial_common.ko "$INSTALLED_KO"
+    sudo depmod -a
 
-if ! grep -q "xr_usb_serial_common" /etc/modules; then
-    echo "xr_usb_serial_common" | sudo tee -a /etc/modules
+    if ! grep -q "xr_usb_serial_common" /etc/modules; then
+        echo "xr_usb_serial_common" | sudo tee -a /etc/modules
+    fi
+
+    echo "Loading module..."
+    sudo modprobe -r xr_usb_serial_common || true
+    sudo modprobe xr_usb_serial_common || sudo insmod "$INSTALLED_KO"
 fi
-
-echo "Loading module..."
-sudo modprobe xr_usb_serial_common || sudo insmod /lib/modules/"$(uname -r)"/kernel/drivers/usb/serial/xr_usb_serial_common.ko
 
 # Run driver binding check
 echo "Binding SC4-Hub to Exar USB Serial driver..."
@@ -152,20 +173,30 @@ else
     echo -e "${YELLOW}[NOTE]: SC4-Hub USB device not found at the moment. Driver module loaded and configured for next plug-in.${NC}"
 fi
 
-echo -e "${GREEN}[5/6] Compiling and installing Coffee Roaster Daemon and Web App...${NC}"
+# [5/6] Compile and install Coffee Roaster Daemon
+echo -e "${GREEN}[5/6] Compiling Coffee Roaster Daemon (incremental)...${NC}"
 cd "$REPO_ROOT"/coffeeRoaster
-make real_clean
-make
+make # Incremental build
+
+OLD_BIN_MD5=""
+if [ -f /usr/local/bin/coffee-roaster ]; then
+    OLD_BIN_MD5=$(md5sum /usr/local/bin/coffee-roaster | awk '{print $1}')
+fi
 
 echo "Installing services..."
-# This will call set-user.sh to write User=$CURRENT_USER inside the service files,
-# copy binaries and service files, copy files to /opt/coffee-roaster, and run systemctl daemon-reload
 sudo make install
 
-echo -e "${GREEN}[6/6] Starting services...${NC}"
-sudo systemctl daemon-reload
-sudo systemctl enable coffee-roaster coffee-roaster-web
-sudo systemctl restart coffee-roaster coffee-roaster-web
+NEW_BIN_MD5=$(md5sum /usr/local/bin/coffee-roaster | awk '{print $1}')
+
+# [6/6] Start/restart services
+if [ "$OLD_BIN_MD5" != "$NEW_BIN_MD5" ] || ! systemctl is-active --quiet coffee-roaster || ! systemctl is-active --quiet coffee-roaster-web; then
+    echo -e "${GREEN}[6/6] Starting/restarting services...${NC}"
+    sudo systemctl daemon-reload
+    sudo systemctl enable coffee-roaster coffee-roaster-web
+    sudo systemctl restart coffee-roaster coffee-roaster-web
+else
+    echo -e "${GREEN}[6/6] Services already running and up-to-date.${NC}"
+fi
 
 echo -e "${BLUE}==================================================================${NC}"
 echo -e "${GREEN}                Installation Completed Successfully!              ${NC}"

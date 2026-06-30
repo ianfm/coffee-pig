@@ -1,4 +1,25 @@
+# Precompiled Objects
 *.o
 *.a
 *.ko
+*.so
+*.so.*
 *.mod
+*.mod.c
+*.cmd
+modules.order
+Module.symvers
+.tmp_versions/
+
+# Executables
+coffeeRoaster/coffee-roaster
+sFoundation/SDK_Examples/Example-Homing/Example-Homing
+sFoundation/SDK_Examples/HelloWorld/HelloWorld
+
+# Build Directories
+build/
+sFoundation/sFoundation/build/
+
+# Local backup / swap files
+*~
+*.swp
