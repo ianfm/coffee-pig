@@ -47,8 +47,14 @@ sudo systemctl restart coffee-roaster coffee-roaster-web
 
 ## Uninstall
 
+To uninstall only the motor daemon and web app:
 ```bash
 sudo make uninstall
+```
+
+To perform a complete clean-slate uninstall of all application components, libraries, and kernel drivers:
+```bash
+../install_clean_slate.sh --uninstall
 ```
 
 ## Configuration
