@@ -25,10 +25,7 @@ else
 endif
 
 install: $(EXEC_NAME)
-	@if ! grep -qP '^User=\S' coffee-roaster.service || ! grep -qP '^User=\S' web/coffee-roaster-web.service; then \
-		echo "User= not set in service files, running set-user.sh..."; \
-		./set-user.sh; \
-	fi
+	./set-user.sh
 	install -m 755 $(EXEC_NAME) /usr/local/bin/
 	install -m 644 coffee-roaster.service /etc/systemd/system/
 	install -m 644 web/coffee-roaster-web.service /etc/systemd/system/
